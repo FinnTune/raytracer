@@ -3,6 +3,35 @@ name = "rt"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "rt"
+path = "src/main.rs"
 
 [dependencies]
+# Math
+nalgebra = "0.32"
+
+# Parallelism
+rayon = "1.8"
+
+# Random
+rand = "0.8"
+
+# GUI
+egui = "0.27"
+eframe = { version = "0.27", default-features = false, features = [
+    "default_fonts",
+    "glow",         # OpenGL backend
+] }
+egui_extras = "0.27"
+
+# Image output
+image = "0.25"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
+[profile.dev]
+opt-level = 1   # Keeps dev builds fast enough to actually run
