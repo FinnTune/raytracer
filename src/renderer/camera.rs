@@ -1,6 +1,7 @@
 use crate::renderer::{ray::Ray, Color};
 use nalgebra::Vector3;
 use rand::Rng;
+use image;
 
 pub struct Camera {
     pub position:   Vector3<f64>,
@@ -8,7 +9,8 @@ pub struct Camera {
     pub up:         Vector3<f64>,
     pub fov_deg:    f64,
     pub aspect:     f64,
-    // Derived — computed once in build()
+    pub width:      u32,
+    pub height:     u32,
     lower_left:     Vector3<f64>,
     horizontal:     Vector3<f64>,
     vertical:       Vector3<f64>,
@@ -69,6 +71,8 @@ impl CameraBuilder {
             up:         self.up,
             fov_deg:    self.fov_deg,
             aspect,
+            width:      self.width,
+            height:     self.height,
             lower_left,
             horizontal,
             vertical,
@@ -115,5 +119,30 @@ impl Camera {
                 color * (1.0 / samples as f64)
             })
             .collect()
+    }
+
+    pub fn write_to_ppm(&self, path: &str, pixels: &[Color]) {
+        use std::io::Write;
+        let (width, height) = (self.width, self.height);
+        let mut f = std::fs::File::create(path).unwrap();
+        writeln!(f, "P3\n{width} {height}\n255").unwrap();
+        for color in pixels {
+            let (r, g, b) = color.to_rgb_u8(2.2);
+            writeln!(f, "{r} {g} {b}").unwrap();
+        }
+    }
+    
+    pub fn write_to_png(&self, path: &str, pixels: &[Color]) {
+        let (width, height) = (self.width, self.height);
+        let mut img = image::RgbImage::new(width, height);
+    
+        for (i, color) in pixels.iter().enumerate() {
+            let x = (i as u32) % width;
+            let y = (i as u32) / width;
+            let (r, g, b) = color.to_rgb_u8(2.2);
+            img.put_pixel(x, y, image::Rgb([r, g, b]));
+        }
+    
+        img.save(path).expect("Failed to write PNG");
     }
 }
