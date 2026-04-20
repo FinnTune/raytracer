@@ -1,5 +1,5 @@
 use crate::materials::Material;
-use crate::objects::{HitRecord, Hittable};
+use crate::objects::Hittable;
 use crate::renderer::{bvh::BvhNode, ray::Ray, Color};
 use std::sync::Arc;
 
