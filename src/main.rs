@@ -4,6 +4,16 @@ use rt::objects::{Cube, Cylinder, Plane, Sphere};
 use rt::renderer::{CameraBuilder, Color, Scene};
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+
+    if args.contains(&"--no-gui".to_string()) {
+        headless();
+    } else {
+        rt::gui::launch();
+    }
+}
+
+fn headless() {
     let mut scene = Scene::new(Color::new(0.05, 0.07, 0.12));
 
     let grey   = scene.add_material(Diffuse::new(Color::new(0.5, 0.5, 0.5)));
@@ -40,8 +50,6 @@ fn main() {
     println!("Done in {:.2?}", start.elapsed());
 
     camera.write_to_ppm("output.ppm", &pixels);
-    println!("Written to output.ppm");
-
     camera.write_to_png("output.png", &pixels);
-    println!("Written to output.png");
+    println!("Written to output.ppm and output.png");
 }
