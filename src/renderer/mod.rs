@@ -1,7 +1,9 @@
-pub mod color;
+pub mod bvh;
 pub mod camera;
+pub mod color;
 pub mod ray;
 pub mod scene;
-pub mod bvh;
 
+pub use camera::{Camera, CameraBuilder};
 pub use color::Color;
+pub use scene::Scene;
