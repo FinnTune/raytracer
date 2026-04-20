@@ -1,3 +1,3 @@
 fn main() {
-    println!("rt");
+    println!("rt — module tree OK");
 }
