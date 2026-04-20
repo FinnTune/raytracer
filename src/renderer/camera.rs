@@ -90,6 +90,7 @@ impl Camera {
     pub fn render(
         &self,
         scene: &crate::renderer::scene::Scene,
+        bvh:     &std::sync::Arc<dyn crate::objects::Hittable>,
         width:   u32,
         height:  u32,
         samples: u32,
@@ -100,17 +101,15 @@ impl Camera {
         (0..height)
             .into_par_iter()
             .rev()
-            .flat_map_iter(|row| {
-                (0..width).map(move |col| (row, col))
-            })
+            .flat_map_iter(|row| (0..width).map(move |col| (row, col)))
             .map(|(row, col)| {
-                let mut rng = rand::thread_rng();
+                let mut rng   = rand::thread_rng();
                 let mut color = Color::BLACK;
 
                 for _ in 0..samples {
                     let u = (col as f64 + rng.gen::<f64>()) / (width  - 1) as f64;
                     let v = (row as f64 + rng.gen::<f64>()) / (height - 1) as f64;
-                    color += scene.trace(&self.ray(u, v), depth);
+                    color += scene.trace_bvh(bvh, &self.ray(u, v), depth);
                 }
 
                 color * (1.0 / samples as f64)

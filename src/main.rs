@@ -4,20 +4,21 @@ use rt::objects::Sphere;
 use rt::renderer::{CameraBuilder, Color, Scene};
 
 fn main() {
-    // --- Scene ---
-    let mut scene = Scene::new(Color::new(0.05, 0.07, 0.12)); // dark blue sky
+    let mut scene = Scene::new(Color::new(0.05, 0.07, 0.12));
 
-    let ground   = scene.add_material(Diffuse::new(Color::new(0.5, 0.5, 0.5)));
-    let red      = scene.add_material(Diffuse::new(Color::new(0.8, 0.2, 0.2)));
-    let mirror   = scene.add_material(Reflective::new(Color::new(0.8, 0.8, 0.8), 0.05));
-    let light    = scene.add_material(Emissive::new(Color::WHITE, 4.0));
+    let ground = scene.add_material(Diffuse::new(Color::new(0.5, 0.5, 0.5)));
+    let red    = scene.add_material(Diffuse::new(Color::new(0.8, 0.2, 0.2)));
+    let mirror = scene.add_material(Reflective::new(Color::new(0.8, 0.8, 0.8), 0.05));
+    let light  = scene.add_material(Emissive::new(Color::WHITE, 4.0));
 
     scene.add_object(Sphere::new(Vector3::new( 0.0, -100.5, -1.0), 100.0, ground));
     scene.add_object(Sphere::new(Vector3::new( 0.0,    0.0, -1.0),   0.5, red));
     scene.add_object(Sphere::new(Vector3::new( 1.2,    0.0, -1.0),   0.5, mirror));
     scene.add_object(Sphere::new(Vector3::new( 0.0,    2.0, -1.0),   0.5, light));
 
-    // --- Camera ---
+    // Build BVH once — all subsequent traces use it
+    let bvh = scene.build_bvh();
+
     let width   = 400u32;
     let height  = 225u32;
     let samples = 64u32;
@@ -30,12 +31,11 @@ fn main() {
         .resolution(width, height)
         .build();
 
-    println!("Rendering {width}x{height} — {samples} samples, depth {depth}...");
+    println!("Rendering {width}x{height} — {samples} samples, depth {depth} (BVH)...");
     let start  = std::time::Instant::now();
-    let pixels = camera.render(&scene, width, height, samples, depth);
+    let pixels = camera.render(&scene, &bvh, width, height, samples, depth);
     println!("Done in {:.2?}", start.elapsed());
 
-    // --- Write PPM ---
     use std::io::Write;
     let mut f = std::fs::File::create("output.ppm").unwrap();
     writeln!(f, "P3\n{width} {height}\n255").unwrap();
