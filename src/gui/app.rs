@@ -202,7 +202,9 @@ fn build_and_render(app: &RtApp) -> Vec<u8> {
 
     let pixels = camera.render(&scene, &bvh, app.width, app.height, app.samples, app.depth);
 
-    // Save files as a side effect
+    // Denoise before output
+    let pixels = crate::renderer::camera::denoise(&pixels, app.width, app.height);
+
     camera.write_to_ppm("output.ppm", &pixels);
     camera.write_to_png("output.png", &pixels);
 
@@ -266,7 +268,7 @@ impl RtApp {
             ui.label("Height");
             ui.add(egui::DragValue::new(&mut self.height).clamp_range(100u32..=2160u32));
         });
-        ui.add(egui::Slider::new(&mut self.samples, 1..=1024).text("Samples").logarithmic(true));
+        ui.add(egui::Slider::new(&mut self.samples, 1..=4096).text("Samples").logarithmic(true));
         ui.add(egui::Slider::new(&mut self.depth, 1..=64).text("Depth"));
     }
 
@@ -413,7 +415,7 @@ pub fn launch() {
             .with_inner_size([1100.0, 700.0]),
         ..Default::default()
     };
-    
+
     eframe::run_native(
         "rt",
         options,

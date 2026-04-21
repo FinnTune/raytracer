@@ -47,9 +47,12 @@ fn headless() {
     println!("Rendering {width}x{height} — {samples} samples, depth {depth}...");
     let start  = std::time::Instant::now();
     let pixels = camera.render(&scene, &bvh, width, height, samples, depth);
-    println!("Done in {:.2?}", start.elapsed());
+    let pixels = rt::renderer::camera::denoise(&pixels, width, height);
 
+    println!("Done in {:.2?}. Writing to output.ppm and output.png...", start.elapsed());
+    
     camera.write_to_ppm("output.ppm", &pixels);
     camera.write_to_png("output.png", &pixels);
-    println!("Written to output.ppm and output.png");
+    
+    println!("Done.");
 }

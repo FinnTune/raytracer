@@ -1,4 +1,5 @@
 use crate::renderer::{ray::Ray, Color};
+
 use nalgebra::Vector3;
 use rand::Rng;
 use image;
@@ -145,4 +146,55 @@ impl Camera {
     
         img.save(path).expect("Failed to write PNG");
     }
+}
+
+pub fn denoise(pixels: &[Color], width: u32, height: u32) -> Vec<Color> {
+    let w = width  as usize;
+    let h = height as usize;
+    let radius  = 1usize;  // 3x3 neighbourhood
+    let sigma_s = 1.0f64;  // spatial falloff
+    let sigma_r = 0.1f64;  // color similarity falloff
+
+    let mut output = vec![Color::BLACK; pixels.len()];
+
+    for y in 0..h {
+        for x in 0..w {
+            let center = pixels[y * w + x];
+            let mut total_weight = 0.0f64;
+            let mut total_color  = Color::BLACK;
+
+            for dy in -(radius as i32)..=(radius as i32) {
+                for dx in -(radius as i32)..=(radius as i32) {
+                    let nx = x as i32 + dx;
+                    let ny = y as i32 + dy;
+
+                    // Skip out-of-bounds neighbours
+                    if nx < 0 || ny < 0 || nx >= w as i32 || ny >= h as i32 {
+                        continue;
+                    }
+
+                    let neighbour = pixels[ny as usize * w + nx as usize];
+
+                    // Spatial weight — prefer nearby pixels
+                    let spatial = -(dx * dx + dy * dy) as f64
+                        / (2.0 * sigma_s * sigma_s);
+
+                    // Range weight — prefer similar-colored pixels
+                    let dr = center.r - neighbour.r;
+                    let dg = center.g - neighbour.g;
+                    let db = center.b - neighbour.b;
+                    let range = -(dr * dr + dg * dg + db * db)
+                        / (2.0 * sigma_r * sigma_r);
+
+                    let weight = (spatial + range).exp();
+                    total_weight += weight;
+                    total_color  += neighbour * weight;
+                }
+            }
+
+            output[y * w + x] = total_color * (1.0 / total_weight);
+        }
+    }
+
+    output
 }
