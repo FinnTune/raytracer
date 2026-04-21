@@ -224,4 +224,6 @@ cargo test
 
 ## License
 
-MIT
+Licensed under the GNU General Public License v2.0 (`GPL-2.0`).
+
+Copyright (C) 2026 FinnTune
