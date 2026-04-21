@@ -1,10 +1,14 @@
+use std::sync::{Arc, atomic::{AtomicU64, Ordering}};
+use std::sync::mpsc::{self, Receiver};
+
 use crate::materials::{Diffuse, Emissive, Reflective};
 use crate::objects::{Cube, Cylinder, Plane, Sphere};
 use crate::renderer::{CameraBuilder, Color, Scene};
+use crate::renderer::camera::denoise;
 use eframe::egui;
 use nalgebra::Vector3;
 
-// ── Object list ──────────────────────────────────────────────────────────────
+// ── Object types ──────────────────────────────────────────────────────────────
 
 #[derive(Clone, PartialEq)]
 pub enum ObjectKind {
@@ -49,11 +53,11 @@ pub struct SceneObject {
     pub x:        f32,
     pub y:        f32,
     pub z:        f32,
-    pub size:     f32,   // radius for sphere/cylinder/plane, side for cube
-    pub height:   f32,   // cylinder only
+    pub size:     f32,
+    pub height:   f32,
     pub color:    [f32; 3],
-    pub strength: f32,   // emissive only
-    pub fuzz:     f32,   // reflective only
+    pub strength: f32,
+    pub fuzz:     f32,
 }
 
 impl Default for SceneObject {
@@ -71,30 +75,36 @@ impl Default for SceneObject {
     }
 }
 
-// ── App state ─────────────────────────────────────────────────────────────────
+// ── Render state ──────────────────────────────────────────────────────────────
 
-pub struct RtApp {
-    // Camera
-    cam_x:    f32,
-    cam_y:    f32,
-    cam_z:    f32,
-    look_x:   f32,
-    look_y:   f32,
-    look_z:   f32,
-    fov:      f32,
-
-    // Render settings
+struct RenderJob {
+    progress: Arc<AtomicU64>,
+    total:    u64,
+    receiver: Receiver<Vec<u8>>,
     width:    u32,
     height:   u32,
-    samples:  u32,
-    depth:    u32,
+}
 
-    // Scene objects
-    objects:  Vec<SceneObject>,
+// ── App ───────────────────────────────────────────────────────────────────────
 
-    // Output
-    status:   String,
-    texture:  Option<egui::TextureHandle>,
+pub struct RtApp {
+    cam_x:   f32,
+    cam_y:   f32,
+    cam_z:   f32,
+    look_x:  f32,
+    look_y:  f32,
+    look_z:  f32,
+    fov:     f32,
+
+    width:   u32,
+    height:  u32,
+    samples: u32,
+    depth:   u32,
+
+    objects: Vec<SceneObject>,
+    status:  String,
+    texture: Option<egui::TextureHandle>,
+    job:     Option<RenderJob>,
 }
 
 impl Default for RtApp {
@@ -109,11 +119,12 @@ impl Default for RtApp {
             fov:     45.0,
             width:   600,
             height:  400,
-            samples: 64,
+            samples: 256,
             depth:   16,
             objects: default_scene(),
             status:  "Ready.".into(),
             texture: None,
+            job:     None,
         }
     }
 }
@@ -166,22 +177,21 @@ fn default_scene() -> Vec<SceneObject> {
     ]
 }
 
-// ── Rendering ─────────────────────────────────────────────────────────────────
+// ── Scene building ────────────────────────────────────────────────────────────
 
-fn build_and_render(app: &RtApp) -> Vec<u8> {
+fn build_scene(objects: &[SceneObject]) -> Scene {
     let mut scene = Scene::new(Color::new(0.05, 0.07, 0.12));
 
-    for obj in &app.objects {
+    for obj in objects {
         let [r, g, b] = obj.color;
-        let color = Color::new(r as f64, g as f64, b as f64);
+        let color  = Color::new(r as f64, g as f64, b as f64);
+        let pos    = Vector3::new(obj.x as f64, obj.y as f64, obj.z as f64);
 
         let mat_id = match obj.material {
             MaterialKind::Diffuse    => scene.add_material(Diffuse::new(color)),
             MaterialKind::Reflective => scene.add_material(Reflective::new(color, obj.fuzz as f64)),
             MaterialKind::Emissive   => scene.add_material(Emissive::new(color, obj.strength as f64)),
         };
-
-        let pos = Vector3::new(obj.x as f64, obj.y as f64, obj.z as f64);
 
         match obj.kind {
             ObjectKind::Sphere   => scene.add_object(Sphere::new(pos, obj.size as f64, mat_id)),
@@ -191,37 +201,37 @@ fn build_and_render(app: &RtApp) -> Vec<u8> {
         }
     }
 
-    let bvh = scene.build_bvh();
-
-    let camera = CameraBuilder::new()
-        .position(Vector3::new(app.cam_x as f64, app.cam_y as f64, app.cam_z as f64))
-        .look_at(Vector3::new(app.look_x as f64, app.look_y as f64, app.look_z as f64))
-        .fov(app.fov as f64)
-        .resolution(app.width, app.height)
-        .build();
-
-    let pixels = camera.render(&scene, &bvh, app.width, app.height, app.samples, app.depth);
-
-    // Denoise before output
-    let pixels = crate::renderer::camera::denoise(&pixels, app.width, app.height);
-
-    camera.write_to_ppm("output.ppm", &pixels);
-    camera.write_to_png("output.png", &pixels);
-
-    // Return raw RGBA bytes for egui texture
-    pixels
-        .iter()
-        .flat_map(|c| {
-            let (r, g, b) = c.to_rgb_u8(2.2);
-            [r, g, b, 255u8]
-        })
-        .collect()
+    scene
 }
 
 // ── UI ────────────────────────────────────────────────────────────────────────
 
 impl eframe::App for RtApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Poll background render job
+        if let Some(job) = &self.job {
+            let done  = job.progress.load(Ordering::Relaxed);
+            let frac  = done as f32 / job.total as f32;
+            self.status = format!("Rendering… {:.0}%", frac * 100.0);
+
+            if let Ok(rgba) = job.receiver.try_recv() {
+                let tex = ctx.load_texture(
+                    "render",
+                    egui::ColorImage::from_rgba_unmultiplied(
+                        [job.width as usize, job.height as usize],
+                        &rgba,
+                    ),
+                    egui::TextureOptions::LINEAR,
+                );
+                self.texture = Some(tex);
+                self.status  = "Done. output.png and output.ppm written.".into();
+                self.job     = None;
+            } else {
+                // Keep repainting while job is running
+                ctx.request_repaint();
+            }
+        }
+
         egui::SidePanel::left("controls")
             .min_width(280.0)
             .show(ctx, |ui| {
@@ -230,7 +240,7 @@ impl eframe::App for RtApp {
                     ui.separator();
                     self.draw_render_settings(ui);
                     ui.separator();
-                    self.draw_objects_section(ui, ctx);
+                    self.draw_objects_section(ui);
                     ui.separator();
                     self.draw_render_button(ui, ctx);
                 });
@@ -272,7 +282,7 @@ impl RtApp {
         ui.add(egui::Slider::new(&mut self.depth, 1..=64).text("Depth"));
     }
 
-    fn draw_objects_section(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
+    fn draw_objects_section(&mut self, ui: &mut egui::Ui) {
         ui.heading("Objects");
 
         if ui.button("+ Add object").clicked() {
@@ -286,7 +296,6 @@ impl RtApp {
                 egui::CollapsingHeader::new(format!("{} {}", obj.kind, i + 1))
                     .default_open(false)
                     .show(ui, |ui| {
-                        // Kind selector
                         egui::ComboBox::from_label("Type")
                             .selected_text(obj.kind.to_string())
                             .show_ui(ui, |ui| {
@@ -296,7 +305,6 @@ impl RtApp {
                                 ui.selectable_value(&mut obj.kind, ObjectKind::Plane,    "Plane");
                             });
 
-                        // Position
                         ui.label("Position");
                         ui.horizontal(|ui| {
                             ui.label("X"); ui.add(egui::DragValue::new(&mut obj.x).speed(0.05));
@@ -304,19 +312,16 @@ impl RtApp {
                             ui.label("Z"); ui.add(egui::DragValue::new(&mut obj.z).speed(0.05));
                         });
 
-                        // Size
                         let size_label = match obj.kind {
-                            ObjectKind::Cube => "Side length",
-                            _                => "Radius",
+                            ObjectKind::Cube => "Side length: ",
+                            _                => "Radius: ",
                         };
                         ui.add(egui::DragValue::new(&mut obj.size).speed(0.05).prefix(size_label));
 
-                        // Height — cylinder only
                         if obj.kind == ObjectKind::Cylinder {
                             ui.add(egui::DragValue::new(&mut obj.height).speed(0.05).prefix("Height: "));
                         }
 
-                        // Material
                         egui::ComboBox::from_label("Material")
                             .selected_text(obj.material.to_string())
                             .show_ui(ui, |ui| {
@@ -325,13 +330,11 @@ impl RtApp {
                                 ui.selectable_value(&mut obj.material, MaterialKind::Emissive,   "Emissive");
                             });
 
-                        // Color
                         ui.horizontal(|ui| {
                             ui.label("Color");
                             ui.color_edit_button_rgb(&mut obj.color);
                         });
 
-                        // Material-specific
                         match obj.material {
                             MaterialKind::Reflective => {
                                 ui.add(egui::Slider::new(&mut obj.fuzz, 0.0..=1.0).text("Fuzz"));
@@ -356,43 +359,94 @@ impl RtApp {
 
     fn draw_render_button(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         ui.add_space(8.0);
-        let button = egui::Button::new(
-            egui::RichText::new("Render").size(16.0)
-        );
-        if ui.add_sized([ui.available_width(), 36.0], button).clicked() {
+
+        let rendering = self.job.is_some();
+
+        // Progress bar — only visible while rendering
+        if let Some(job) = &self.job {
+            let done = job.progress.load(Ordering::Relaxed);
+            let frac = done as f32 / job.total as f32;
+            ui.add(
+                egui::ProgressBar::new(frac)
+                    .show_percentage()
+                    .animate(true)
+            );
+        }
+
+        let label  = if rendering { "Rendering…" } else { "Render" };
+        let button = egui::Button::new(egui::RichText::new(label).size(16.0));
+
+        if ui.add_enabled(
+            !rendering,
+            egui::widgets::Button::new(egui::RichText::new(label).size(16.0))
+                .min_size(egui::vec2(ui.available_width(), 36.0)),
+        ).clicked() {
             if self.objects.is_empty() {
                 self.status = "Add at least one object first.".into();
                 return;
             }
-            self.status = "Rendering…".into();
-
-            let rgba = build_and_render(self);
-
-            let tex = ctx.load_texture(
-                "render",
-                egui::ColorImage::from_rgba_unmultiplied(
-                    [self.width as usize, self.height as usize],
-                    &rgba,
-                ),
-                egui::TextureOptions::LINEAR,
-            );
-            self.texture = Some(tex);
-            self.status  = format!(
-                "Done. output.png and output.ppm written."
-            );
+            self.start_render(ctx);
         }
+        let _ = button; // suppress unused warning
+
         ui.label(&self.status);
+    }
+
+    fn start_render(&mut self, ctx: &egui::Context) {
+        let objects  = self.objects.clone();
+        let cam_pos  = Vector3::new(self.cam_x as f64, self.cam_y as f64, self.cam_z as f64);
+        let look_at  = Vector3::new(self.look_x as f64, self.look_y as f64, self.look_z as f64);
+        let fov      = self.fov as f64;
+        let width    = self.width;
+        let height   = self.height;
+        let samples  = self.samples;
+        let depth    = self.depth;
+
+        let progress = Arc::new(AtomicU64::new(0));
+        let total    = (width * height) as u64;
+        let (tx, rx) = mpsc::channel();
+
+        let progress_clone = Arc::clone(&progress);
+        let ctx_clone      = ctx.clone();
+
+        std::thread::spawn(move || {
+            let mut scene  = build_scene(&objects);
+            let bvh        = scene.build_bvh();
+            let camera     = CameraBuilder::new()
+                .position(cam_pos)
+                .look_at(look_at)
+                .fov(fov)
+                .resolution(width, height)
+                .build();
+
+            let pixels = camera.render(&scene, &bvh, width, height, samples, depth, progress_clone);
+            let pixels = denoise(&pixels, width, height);
+
+            camera.write_to_ppm("output.ppm", &pixels);
+            camera.write_to_png("output.png", &pixels);
+
+            let rgba: Vec<u8> = pixels
+                .iter()
+                .flat_map(|c| {
+                    let (r, g, b) = c.to_rgb_u8(2.2);
+                    [r, g, b, 255u8]
+                })
+                .collect();
+
+            tx.send(rgba).ok();
+            ctx_clone.request_repaint();
+        });
+
+        self.job    = Some(RenderJob { progress, total, receiver: rx, width, height });
+        self.status = "Rendering…".into();
     }
 
     fn draw_viewport(&self, ui: &mut egui::Ui) {
         if let Some(tex) = &self.texture {
             let available = ui.available_size();
             let img_size  = tex.size_vec2();
-
-            // Fit image inside available space, preserving aspect ratio
-            let scale = (available.x / img_size.x).min(available.y / img_size.y);
-            let size  = egui::vec2(img_size.x * scale, img_size.y * scale);
-
+            let scale     = (available.x / img_size.x).min(available.y / img_size.y);
+            let size      = egui::vec2(img_size.x * scale, img_size.y * scale);
             ui.centered_and_justified(|ui| {
                 ui.image((tex.id(), size));
             });

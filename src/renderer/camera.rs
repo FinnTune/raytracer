@@ -1,4 +1,5 @@
 use crate::renderer::{ray::Ray, Color};
+use std::sync::{Arc, atomic::{AtomicU64, Ordering}};
 
 use nalgebra::Vector3;
 use rand::Rng;
@@ -94,15 +95,16 @@ impl Camera {
     /// Render the full scene to a flat Vec<Color>, row-major top-to-bottom
     pub fn render(
         &self,
-        scene: &crate::renderer::scene::Scene,
-        bvh:     &std::sync::Arc<dyn crate::objects::Hittable>,
-        width:   u32,
-        height:  u32,
-        samples: u32,
-        depth:   u32,
+        scene:    &crate::renderer::scene::Scene,
+        bvh:      &Arc<dyn crate::objects::Hittable>,
+        width:    u32,
+        height:   u32,
+        samples:  u32,
+        depth:    u32,
+        progress: Arc<AtomicU64>,
     ) -> Vec<Color> {
         use rayon::prelude::*;
-
+    
         (0..height)
             .into_par_iter()
             .rev()
@@ -110,13 +112,14 @@ impl Camera {
             .map(|(row, col)| {
                 let mut rng   = rand::thread_rng();
                 let mut color = Color::BLACK;
-
+    
                 for _ in 0..samples {
                     let u = (col as f64 + rng.gen::<f64>()) / (width  - 1) as f64;
                     let v = (row as f64 + rng.gen::<f64>()) / (height - 1) as f64;
                     color += scene.trace_bvh(bvh, &self.ray(u, v), depth);
                 }
-
+    
+                progress.fetch_add(1, Ordering::Relaxed);
                 color * (1.0 / samples as f64)
             })
             .collect()

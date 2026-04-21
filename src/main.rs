@@ -1,3 +1,4 @@
+use std::sync::{Arc, atomic::AtomicU64};
 use nalgebra::Vector3;
 use rt::materials::{Diffuse, Emissive, Reflective};
 use rt::objects::{Cube, Cylinder, Plane, Sphere};
@@ -5,7 +6,6 @@ use rt::renderer::{CameraBuilder, Color, Scene};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-
     if args.contains(&"--no-gui".to_string()) {
         headless();
     } else {
@@ -45,14 +45,13 @@ fn headless() {
         .build();
 
     println!("Rendering {width}x{height} — {samples} samples, depth {depth}...");
-    let start  = std::time::Instant::now();
-    let pixels = camera.render(&scene, &bvh, width, height, samples, depth);
-    let pixels = rt::renderer::camera::denoise(&pixels, width, height);
+    let start    = std::time::Instant::now();
+    let progress = Arc::new(AtomicU64::new(0));
+    let pixels   = camera.render(&scene, &bvh, width, height, samples, depth, progress);
+    let pixels   = rt::renderer::camera::denoise(&pixels, width, height);
+    println!("Done in {:.2?}", start.elapsed());
 
-    println!("Done in {:.2?}. Writing to output.ppm and output.png...", start.elapsed());
-    
     camera.write_to_ppm("output.ppm", &pixels);
     camera.write_to_png("output.png", &pixels);
-    
-    println!("Done.");
+    println!("Written to output.ppm and output.png");
 }
