@@ -224,6 +224,7 @@ cargo test
 
 ## License
 
-Licensed under the GNU General Public License v2.0 (`GPL-2.0`).
+Copyright (C) 2026 Andre Teetor
 
-Copyright (C) 2026 FinnTune
+This project is licensed under the GNU General Public License v2.0 —
+see the [LICENSE](LICENSE) file for details.
