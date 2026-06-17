@@ -207,11 +207,10 @@ fn build_scene(objects: &[SceneObject]) -> Scene {
 // ── UI ────────────────────────────────────────────────────────────────────────
 
 impl eframe::App for RtApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Poll background render job
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         if let Some(job) = &self.job {
-            let done  = job.progress.load(Ordering::Relaxed);
-            let frac  = done as f32 / job.total as f32;
+            let done = job.progress.load(Ordering::Relaxed);
+            let frac = done as f32 / job.total as f32;
             self.status = format!("Rendering… {:.0}%", frac * 100.0);
 
             if let Ok(rgba) = job.receiver.try_recv() {
@@ -224,17 +223,18 @@ impl eframe::App for RtApp {
                     egui::TextureOptions::LINEAR,
                 );
                 self.texture = Some(tex);
-                self.status  = "Done. output.png and output.ppm written.".into();
-                self.job     = None;
+                self.status = "Done. output.png and output.ppm written.".into();
+                self.job = None;
             } else {
-                // Keep repainting while job is running
                 ctx.request_repaint();
             }
         }
+    }
 
-        egui::SidePanel::left("controls")
-            .min_width(280.0)
-            .show(ctx, |ui| {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        egui::Panel::left("controls")
+            .min_size(280.0)
+            .show_inside(ui, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     self.draw_camera_section(ui);
                     ui.separator();
@@ -242,11 +242,11 @@ impl eframe::App for RtApp {
                     ui.separator();
                     self.draw_objects_section(ui);
                     ui.separator();
-                    self.draw_render_button(ui, ctx);
+                    self.draw_render_button(ui);
                 });
             });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show_inside(ui, |ui| {
             self.draw_viewport(ui);
         });
     }
@@ -274,9 +274,9 @@ impl RtApp {
         ui.heading("Render");
         ui.horizontal(|ui| {
             ui.label("Width");
-            ui.add(egui::DragValue::new(&mut self.width).clamp_range(100u32..=3840u32));
+            ui.add(egui::DragValue::new(&mut self.width).range(100u32..=3840u32));
             ui.label("Height");
-            ui.add(egui::DragValue::new(&mut self.height).clamp_range(100u32..=2160u32));
+            ui.add(egui::DragValue::new(&mut self.height).range(100u32..=2160u32));
         });
         ui.add(egui::Slider::new(&mut self.samples, 1..=4096).text("Samples").logarithmic(true));
         ui.add(egui::Slider::new(&mut self.depth, 1..=64).text("Depth"));
@@ -357,7 +357,7 @@ impl RtApp {
         }
     }
 
-    fn draw_render_button(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+    fn draw_render_button(&mut self, ui: &mut egui::Ui) {
         ui.add_space(8.0);
 
         let rendering = self.job.is_some();
@@ -385,7 +385,7 @@ impl RtApp {
                 self.status = "Add at least one object first.".into();
                 return;
             }
-            self.start_render(ctx);
+            self.start_render(ui.ctx());
         }
         let _ = button; // suppress unused warning
 
@@ -473,7 +473,7 @@ pub fn launch() {
     eframe::run_native(
         "rt",
         options,
-        Box::new(|_cc| Box::new(RtApp::default())),
+        Box::new(|_cc| Ok(Box::new(RtApp::default()))),
     )
     .expect("Failed to launch GUI");
 }
