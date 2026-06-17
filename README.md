@@ -218,7 +218,7 @@ integration. The denoiser compensates significantly at lower sample counts.
 cargo test
 ```
 
-17 unit tests covering the color model, BVH traversal, and all four geometry types.
+20 integration tests in `tests/` covering the color model, BVH traversal, and all four geometry types. CI runs them automatically on every push and pull request to `master`.
 
 ---
 
