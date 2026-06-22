@@ -15,7 +15,7 @@ nalgebra = "0.35"
 rayon = "1.8"
 
 # Random
-rand = "0.9"
+rand = "0.10"
 
 # GUI
 egui = "0.34"
