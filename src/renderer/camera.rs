@@ -2,7 +2,7 @@ use crate::renderer::{ray::Ray, Color};
 use std::sync::{Arc, atomic::{AtomicU64, Ordering}};
 
 use nalgebra::Vector3;
-use rand::Rng;
+use rand::RngExt;
 use image;
 
 pub struct Camera {
@@ -110,12 +110,12 @@ impl Camera {
             .rev()
             .flat_map_iter(|row| (0..width).map(move |col| (row, col)))
             .map(|(row, col)| {
-                let mut rng   = rand::thread_rng();
+                let mut rng   = rand::rng();
                 let mut color = Color::BLACK;
-    
+
                 for _ in 0..samples {
-                    let u = (col as f64 + rng.gen::<f64>()) / (width  - 1) as f64;
-                    let v = (row as f64 + rng.gen::<f64>()) / (height - 1) as f64;
+                    let u = (col as f64 + rng.random::<f64>()) / (width  - 1) as f64;
+                    let v = (row as f64 + rng.random::<f64>()) / (height - 1) as f64;
                     color += scene.trace_bvh(bvh, &self.ray(u, v), depth);
                 }
     

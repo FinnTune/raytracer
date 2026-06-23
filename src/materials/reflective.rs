@@ -2,7 +2,7 @@ use crate::materials::{Material, Scatter};
 use crate::objects::HitRecord;
 use crate::renderer::{ray::Ray, Color};
 use nalgebra::Vector3;
-use rand::Rng;
+use rand::RngExt;
 
 pub struct Reflective {
     pub albedo: Color,
@@ -21,12 +21,12 @@ fn reflect(v: Vector3<f64>, n: Vector3<f64>) -> Vector3<f64> {
 }
 
 fn random_in_unit_sphere() -> Vector3<f64> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     loop {
         let v = Vector3::new(
-            rng.gen_range(-1.0..1.0),
-            rng.gen_range(-1.0..1.0),
-            rng.gen_range(-1.0..1.0),
+            rng.random_range(-1.0..1.0),
+            rng.random_range(-1.0..1.0),
+            rng.random_range(-1.0..1.0),
         );
         if v.norm_squared() < 1.0 {
             return v;
