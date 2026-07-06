@@ -25,7 +25,7 @@ eframe = { version = "0.35", default-features = false, features = [
     "x11",
     "wayland",
 ] }
-egui_extras = { version = "0.34", features = ["image"] }
+egui_extras = { version = "0.35", features = ["image"] }
 
 # Image output
 image = "0.25"
