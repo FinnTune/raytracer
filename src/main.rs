@@ -1,17 +1,21 @@
 use clap::Parser;
 use nalgebra::Vector3;
-use rt::materials::{Dielectric, Diffuse, Emissive, Reflective};
-use rt::objects::{Cube, Cylinder, Plane, Sphere};
-use rt::renderer::{CameraBuilder, Color, Scene};
+use rt::renderer::CameraBuilder;
+use rt::scene_file::{default_scene_objects, CameraSettings, SceneFile};
 use std::sync::{atomic::AtomicU64, Arc};
 
-/// Renders the hardcoded demo scene from the command line, or launches the GUI.
+/// Renders a scene from the command line, or launches the GUI.
 #[derive(Parser)]
 #[command(version)]
 struct Cli {
-    /// Render the demo scene headlessly instead of launching the GUI
+    /// Render headlessly instead of launching the GUI
     #[arg(long)]
     no_gui: bool,
+
+    /// Path to a scene JSON file (as saved from the GUI). Renders the
+    /// built-in demo scene if not given.
+    #[arg(long)]
+    scene: Option<String>,
 
     /// Output image width in pixels
     #[arg(long, default_value_t = 600)]
@@ -40,24 +44,18 @@ fn main() {
 }
 
 fn headless(cli: &Cli) {
-    let mut scene = Scene::new(Color::new(0.05, 0.07, 0.12));
+    let (camera_settings, objects) = match &cli.scene {
+        Some(path) => {
+            let file = SceneFile::load(path).unwrap_or_else(|e| {
+                eprintln!("Failed to load scene from {path}: {e}");
+                std::process::exit(1);
+            });
+            (file.camera, file.objects)
+        }
+        None => (CameraSettings::default(), default_scene_objects()),
+    };
 
-    let grey = scene.add_material(Diffuse::new(Color::new(0.5, 0.5, 0.5)));
-    let red = scene.add_material(Diffuse::new(Color::new(0.8, 0.2, 0.2)));
-    let green = scene.add_material(Diffuse::new(Color::new(0.2, 0.7, 0.3)));
-    let blue = scene.add_material(Diffuse::new(Color::new(0.2, 0.3, 0.9)));
-    let mirror = scene.add_material(Reflective::new(Color::new(0.8, 0.8, 0.8), 0.05));
-    let light = scene.add_material(Emissive::new(Color::WHITE, 5.0));
-    let glass = scene.add_material(Dielectric::new(Color::WHITE, 1.5));
-
-    scene.add_object(Plane::new(Vector3::new(0.0, -0.5, 0.0), 20.0, grey));
-    scene.add_object(Sphere::new(Vector3::new(-1.8, 0.0, 0.0), 0.5, red));
-    scene.add_object(Cube::new(Vector3::new(0.0, 0.0, 0.0), 0.8, mirror));
-    scene.add_object(Cylinder::new(Vector3::new(1.8, -0.5, 0.0), 0.4, 1.0, blue));
-    scene.add_object(Sphere::new(Vector3::new(0.0, 0.7, 0.0), 0.2, green));
-    scene.add_object(Sphere::new(Vector3::new(0.0, 4.0, 1.0), 0.8, light));
-    scene.add_object(Sphere::new(Vector3::new(-0.7, -0.2, 1.5), 0.3, glass));
-
+    let mut scene = rt::scene_file::build_scene(&objects);
     let bvh = scene.build_bvh();
 
     let width = cli.width;
@@ -66,9 +64,17 @@ fn headless(cli: &Cli) {
     let depth = cli.depth;
 
     let camera = CameraBuilder::new()
-        .position(Vector3::new(0.0, 1.5, 6.0))
-        .look_at(Vector3::new(0.0, 0.0, 0.0))
-        .fov(45.0)
+        .position(Vector3::new(
+            camera_settings.position[0] as f64,
+            camera_settings.position[1] as f64,
+            camera_settings.position[2] as f64,
+        ))
+        .look_at(Vector3::new(
+            camera_settings.look_at[0] as f64,
+            camera_settings.look_at[1] as f64,
+            camera_settings.look_at[2] as f64,
+        ))
+        .fov(camera_settings.fov as f64)
         .resolution(width, height)
         .build();
 

@@ -4,85 +4,14 @@ use std::sync::{
     Arc,
 };
 
-use crate::materials::{Dielectric, Diffuse, Emissive, Reflective};
-use crate::objects::{Cube, Cylinder, Plane, Sphere};
 use crate::renderer::camera::denoise;
-use crate::renderer::{CameraBuilder, Color, Scene};
+use crate::renderer::CameraBuilder;
+use crate::scene_file::{
+    build_scene, default_scene_objects, CameraSettings, MaterialKind, ObjectKind, RenderSettings,
+    SceneFile, SceneObject,
+};
 use eframe::egui;
 use nalgebra::Vector3;
-
-// ── Object types ──────────────────────────────────────────────────────────────
-
-#[derive(Clone, PartialEq)]
-pub enum ObjectKind {
-    Sphere,
-    Cube,
-    Cylinder,
-    Plane,
-}
-
-impl std::fmt::Display for ObjectKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ObjectKind::Sphere => write!(f, "Sphere"),
-            ObjectKind::Cube => write!(f, "Cube"),
-            ObjectKind::Cylinder => write!(f, "Cylinder"),
-            ObjectKind::Plane => write!(f, "Plane"),
-        }
-    }
-}
-
-#[derive(Clone, PartialEq)]
-pub enum MaterialKind {
-    Diffuse,
-    Reflective,
-    Emissive,
-    Dielectric,
-}
-
-impl std::fmt::Display for MaterialKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MaterialKind::Diffuse => write!(f, "Diffuse"),
-            MaterialKind::Reflective => write!(f, "Reflective"),
-            MaterialKind::Emissive => write!(f, "Emissive"),
-            MaterialKind::Dielectric => write!(f, "Dielectric"),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct SceneObject {
-    pub kind: ObjectKind,
-    pub material: MaterialKind,
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub size: f32,
-    pub height: f32,
-    pub color: [f32; 3],
-    pub strength: f32,
-    pub fuzz: f32,
-    pub ior: f32,
-}
-
-impl Default for SceneObject {
-    fn default() -> Self {
-        Self {
-            kind: ObjectKind::Sphere,
-            material: MaterialKind::Diffuse,
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            size: 0.5,
-            height: 1.0,
-            color: [0.8, 0.3, 0.2],
-            strength: 3.0,
-            fuzz: 0.05,
-            ior: 1.5,
-        }
-    }
-}
 
 // ── Render state ──────────────────────────────────────────────────────────────
 
@@ -111,6 +40,7 @@ pub struct RtApp {
     depth: u32,
 
     objects: Vec<SceneObject>,
+    scene_path: String,
     status: String,
     texture: Option<egui::TextureHandle>,
     job: Option<RenderJob>,
@@ -130,114 +60,13 @@ impl Default for RtApp {
             height: 400,
             samples: 256,
             depth: 16,
-            objects: default_scene(),
+            objects: default_scene_objects(),
+            scene_path: "scene.json".into(),
             status: "Ready.".into(),
             texture: None,
             job: None,
         }
     }
-}
-
-fn default_scene() -> Vec<SceneObject> {
-    vec![
-        SceneObject {
-            kind: ObjectKind::Plane,
-            material: MaterialKind::Diffuse,
-            x: 0.0,
-            y: -0.5,
-            z: 0.0,
-            size: 20.0,
-            color: [0.5, 0.5, 0.5],
-            ..Default::default()
-        },
-        SceneObject {
-            kind: ObjectKind::Sphere,
-            material: MaterialKind::Diffuse,
-            x: -1.8,
-            y: 0.0,
-            z: 0.0,
-            size: 0.5,
-            color: [0.8, 0.2, 0.2],
-            ..Default::default()
-        },
-        SceneObject {
-            kind: ObjectKind::Cube,
-            material: MaterialKind::Reflective,
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            size: 0.8,
-            color: [0.8, 0.8, 0.8],
-            fuzz: 0.05,
-            ..Default::default()
-        },
-        SceneObject {
-            kind: ObjectKind::Cylinder,
-            material: MaterialKind::Diffuse,
-            x: 1.8,
-            y: -0.5,
-            z: 0.0,
-            size: 0.4,
-            height: 1.0,
-            color: [0.2, 0.3, 0.9],
-            ..Default::default()
-        },
-        SceneObject {
-            kind: ObjectKind::Sphere,
-            material: MaterialKind::Emissive,
-            x: 0.0,
-            y: 4.0,
-            z: 1.0,
-            size: 0.8,
-            color: [1.0, 1.0, 1.0],
-            strength: 5.0,
-            ..Default::default()
-        },
-        SceneObject {
-            kind: ObjectKind::Sphere,
-            material: MaterialKind::Dielectric,
-            x: -0.7,
-            y: -0.2,
-            z: 1.5,
-            size: 0.3,
-            color: [1.0, 1.0, 1.0],
-            ior: 1.5,
-            ..Default::default()
-        },
-    ]
-}
-
-// ── Scene building ────────────────────────────────────────────────────────────
-
-fn build_scene(objects: &[SceneObject]) -> Scene {
-    let mut scene = Scene::new(Color::new(0.05, 0.07, 0.12));
-
-    for obj in objects {
-        let [r, g, b] = obj.color;
-        let color = Color::new(r as f64, g as f64, b as f64);
-        let pos = Vector3::new(obj.x as f64, obj.y as f64, obj.z as f64);
-
-        let mat_id = match obj.material {
-            MaterialKind::Diffuse => scene.add_material(Diffuse::new(color)),
-            MaterialKind::Reflective => scene.add_material(Reflective::new(color, obj.fuzz as f64)),
-            MaterialKind::Emissive => scene.add_material(Emissive::new(color, obj.strength as f64)),
-            MaterialKind::Dielectric => scene.add_material(Dielectric::new(color, obj.ior as f64)),
-        };
-
-        match obj.kind {
-            ObjectKind::Sphere => scene.add_object(Sphere::new(pos, obj.size as f64, mat_id)),
-            ObjectKind::Cube => scene.add_object(Cube::new(pos, obj.size as f64, mat_id)),
-            ObjectKind::Cylinder => scene.add_object(Cylinder::new(
-                pos,
-                obj.size as f64,
-                obj.height as f64,
-                mat_id,
-            )),
-            ObjectKind::Plane => scene.add_object(Plane::new(pos, obj.size as f64, mat_id)),
-        }
-    }
-
-    scene
 }
 
 // ── UI ────────────────────────────────────────────────────────────────────────
@@ -272,6 +101,8 @@ impl eframe::App for RtApp {
             .min_size(280.0)
             .show(ui, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
+                    self.draw_scene_file_section(ui);
+                    ui.separator();
                     self.draw_camera_section(ui);
                     ui.separator();
                     self.draw_render_settings(ui);
@@ -289,6 +120,68 @@ impl eframe::App for RtApp {
 }
 
 impl RtApp {
+    fn draw_scene_file_section(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Scene File");
+        ui.horizontal(|ui| {
+            ui.label("Path");
+            ui.text_edit_singleline(&mut self.scene_path);
+        });
+        ui.horizontal(|ui| {
+            if ui.button("Save").clicked() {
+                match self.save_scene() {
+                    Ok(()) => self.status = format!("Saved scene to {}", self.scene_path),
+                    Err(e) => self.status = format!("Failed to save scene: {e}"),
+                }
+            }
+            if ui.button("Load").clicked() {
+                match self.load_scene() {
+                    Ok(()) => self.status = format!("Loaded scene from {}", self.scene_path),
+                    Err(e) => self.status = format!("Failed to load scene: {e}"),
+                }
+            }
+        });
+    }
+
+    fn save_scene(&self) -> Result<(), String> {
+        let file = SceneFile {
+            camera: CameraSettings {
+                position: [self.cam_x, self.cam_y, self.cam_z],
+                look_at: [self.look_x, self.look_y, self.look_z],
+                fov: self.fov,
+            },
+            render: RenderSettings {
+                width: self.width,
+                height: self.height,
+                samples: self.samples,
+                depth: self.depth,
+            },
+            objects: self.objects.clone(),
+        };
+        file.save(&self.scene_path)
+    }
+
+    fn load_scene(&mut self) -> Result<(), String> {
+        let file = SceneFile::load(&self.scene_path)?;
+
+        self.cam_x = file.camera.position[0];
+        self.cam_y = file.camera.position[1];
+        self.cam_z = file.camera.position[2];
+        self.look_x = file.camera.look_at[0];
+        self.look_y = file.camera.look_at[1];
+        self.look_z = file.camera.look_at[2];
+        self.fov = file.camera.fov;
+
+        self.width = file.render.width;
+        self.height = file.render.height;
+        self.samples = file.render.samples;
+        self.depth = file.render.depth;
+
+        self.objects = file.objects;
+        self.texture = None;
+
+        Ok(())
+    }
+
     fn draw_camera_section(&mut self, ui: &mut egui::Ui) {
         ui.heading("Camera");
         ui.label("Position");
