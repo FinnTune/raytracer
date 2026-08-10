@@ -10,7 +10,7 @@ with [egui](https://github.com/emilk/egui).
 ## Features
 
 - **Path tracing** — physically correct light transport with recursive ray bouncing
-- **Materials** — diffuse (Lambertian), reflective (with adjustable fuzz), emissive (light sources)
+- **Materials** — diffuse (Lambertian), reflective (with adjustable fuzz), emissive (light sources), dielectric (glass, with Snell's law refraction and Schlick reflectance)
 - **Geometry** — sphere, cube, cylinder, circular plane
 - **BVH acceleration** — bounding volume hierarchy for O(log n) ray intersection
 - **Bilateral denoiser** — edge-preserving noise reduction applied after rendering
@@ -113,10 +113,11 @@ Each object has:
 - **Position** — X/Y/Z in world space
 - **Size** — radius for sphere/cylinder/plane, side length for cube
 - **Height** — cylinder only
-- **Material** — Diffuse, Reflective, or Emissive
-- **Color** — picked with a color chooser
+- **Material** — Diffuse, Reflective, Emissive, or Dielectric
+- **Color** — picked with a color chooser (tint for Dielectric)
 - **Fuzz** — reflective only, 0.0 = perfect mirror, 1.0 = very rough
 - **Strength** — emissive only, controls brightness of the light source
+- **Index of refraction** — dielectric only, 1.0 = no bending, ~1.5 = glass, ~2.4 = diamond
 
 ---
 
@@ -135,6 +136,13 @@ are almost fully diffused.
 Does not scatter incoming light. Instead it emits light of a given color and strength.
 Use for light sources — a large, low-strength emissive sphere produces soft area lighting,
 a small high-strength one produces a point-like source.
+
+### Dielectric
+Transparent refractive material — glass, water, diamond. Each hit either reflects or
+refracts the ray, chosen probabilistically via Schlick's approximation of the Fresnel
+effect (more reflective at grazing angles, more transparent head-on). Rays that would
+exceed the critical angle for the surface's index of refraction always reflect (total
+internal reflection). The `color` field tints the glass; leave it white for clear glass.
 
 ---
 
@@ -155,10 +163,11 @@ src/
     cylinder.rs
     plane.rs
   materials/
-    mod.rs          # Material trait, Scatter struct
+    mod.rs          # Material trait, Scatter struct, shared reflect() helper
     diffuse.rs
     reflective.rs
     emissive.rs
+    dielectric.rs
   gui/
     mod.rs
     app.rs          # egui application — scene editor, threaded render, progress bar
@@ -184,6 +193,7 @@ At each surface hit the material decides what happens next:
 - **Diffuse** — scatters the ray in a random hemisphere direction, attenuates by surface color
 - **Reflective** — reflects the ray around the surface normal, with optional fuzz
 - **Emissive** — terminates the path and contributes light directly
+- **Dielectric** — reflects or refracts the ray depending on angle and index of refraction
 
 ### BVH
 
@@ -233,7 +243,7 @@ integration. The denoiser compensates significantly at lower sample counts.
 cargo test
 ```
 
-20 integration tests in `tests/` covering the color model, BVH traversal, and all four geometry types. CI runs them automatically on every push and pull request to `master`.
+25 integration tests in `tests/` covering the color model, BVH traversal, all four geometry types, camera pixel mapping, and dielectric refraction. CI runs them automatically on every push and pull request to `master`.
 
 ---
 

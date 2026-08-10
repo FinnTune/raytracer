@@ -1,6 +1,6 @@
 use clap::Parser;
 use nalgebra::Vector3;
-use rt::materials::{Diffuse, Emissive, Reflective};
+use rt::materials::{Dielectric, Diffuse, Emissive, Reflective};
 use rt::objects::{Cube, Cylinder, Plane, Sphere};
 use rt::renderer::{CameraBuilder, Color, Scene};
 use std::sync::{atomic::AtomicU64, Arc};
@@ -48,6 +48,7 @@ fn headless(cli: &Cli) {
     let blue = scene.add_material(Diffuse::new(Color::new(0.2, 0.3, 0.9)));
     let mirror = scene.add_material(Reflective::new(Color::new(0.8, 0.8, 0.8), 0.05));
     let light = scene.add_material(Emissive::new(Color::WHITE, 5.0));
+    let glass = scene.add_material(Dielectric::new(Color::WHITE, 1.5));
 
     scene.add_object(Plane::new(Vector3::new(0.0, -0.5, 0.0), 20.0, grey));
     scene.add_object(Sphere::new(Vector3::new(-1.8, 0.0, 0.0), 0.5, red));
@@ -55,6 +56,7 @@ fn headless(cli: &Cli) {
     scene.add_object(Cylinder::new(Vector3::new(1.8, -0.5, 0.0), 0.4, 1.0, blue));
     scene.add_object(Sphere::new(Vector3::new(0.0, 0.7, 0.0), 0.2, green));
     scene.add_object(Sphere::new(Vector3::new(0.0, 4.0, 1.0), 0.8, light));
+    scene.add_object(Sphere::new(Vector3::new(-0.7, -0.2, 1.5), 0.3, glass));
 
     let bvh = scene.build_bvh();
 
