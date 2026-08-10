@@ -71,6 +71,21 @@ cargo run --release -- --no-gui
 
 Renders the hardcoded scene in `main.rs` and writes `output.png` and `output.ppm` directly.
 
+Resolution and render quality can be overridden with flags:
+
+```bash
+cargo run --release -- --no-gui --width 1920 --height 1080 --samples 512 --depth 32
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--width` | 600 | Output image width in pixels |
+| `--height` | 400 | Output image height in pixels |
+| `--samples` | 128 | Rays per pixel |
+| `--depth` | 32 | Maximum ray bounces |
+
+Run `cargo run --release -- --help` for the full list.
+
 ---
 
 ## GUI Reference
