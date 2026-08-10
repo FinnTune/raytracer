@@ -97,6 +97,26 @@ impl CameraBuilder {
     }
 }
 
+/// Map a pixel coordinate plus per-sample jitter to normalized (u, v) in [0, 1].
+///
+/// A dimension of 1 has no span to normalize against — dividing by
+/// `dimension - 1` would divide by zero — so in that case the jitter alone
+/// (already in [0, 1)) is used directly.
+pub fn pixel_uv(
+    col: u32,
+    row: u32,
+    width: u32,
+    height: u32,
+    jitter_u: f64,
+    jitter_v: f64,
+) -> (f64, f64) {
+    let u_denom = if width > 1 { (width - 1) as f64 } else { 1.0 };
+    let v_denom = if height > 1 { (height - 1) as f64 } else { 1.0 };
+    let u = (col as f64 + jitter_u) / u_denom;
+    let v = (row as f64 + jitter_v) / v_denom;
+    (u, v)
+}
+
 impl Camera {
     /// Generate a ray through pixel (u, v) where both are in [0, 1]
     pub fn ray(&self, u: f64, v: f64) -> Ray {
@@ -126,8 +146,7 @@ impl Camera {
                 let mut color = Color::BLACK;
 
                 for _ in 0..samples {
-                    let u = (col as f64 + rng.random::<f64>()) / (width - 1) as f64;
-                    let v = (row as f64 + rng.random::<f64>()) / (height - 1) as f64;
+                    let (u, v) = pixel_uv(col, row, width, height, rng.random(), rng.random());
                     color += scene.trace_bvh(bvh, &self.ray(u, v), depth);
                 }
 
