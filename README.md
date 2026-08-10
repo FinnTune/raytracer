@@ -17,6 +17,7 @@ with [egui](https://github.com/emilk/egui).
 - **Output** — writes both PNG and PPM on every render
 - **GUI** — egui scene editor with camera controls, per-object configuration, and a live progress bar
 - **Headless mode** — render from the command line without launching the GUI
+- **Scene files** — save/load scenes as JSON from the GUI, render them headlessly with `--scene`
 
 ---
 
@@ -69,7 +70,7 @@ written to `output.png` and `output.ppm` in the project root.
 cargo run --release -- --no-gui
 ```
 
-Renders the hardcoded scene in `main.rs` and writes `output.png` and `output.ppm` directly.
+Renders the built-in demo scene and writes `output.png` and `output.ppm` directly.
 
 Resolution and render quality can be overridden with flags:
 
@@ -83,12 +84,38 @@ cargo run --release -- --no-gui --width 1920 --height 1080 --samples 512 --depth
 | `--height` | 400 | Output image height in pixels |
 | `--samples` | 128 | Rays per pixel |
 | `--depth` | 32 | Maximum ray bounces |
+| `--scene` | *(built-in demo)* | Path to a scene JSON file — see [Scene Files](#scene-files) |
 
 Run `cargo run --release -- --help` for the full list.
+
+### Scene Files
+
+Scenes built in the GUI can be saved to a JSON file and rendered headlessly — useful for
+tweaking a scene interactively, then batch-rendering it at high quality from the command
+line:
+
+```bash
+cargo run --release -- --no-gui --scene my_scene.json --samples 2048 --depth 32
+```
+
+In the GUI, the **Scene File** panel at the top of the sidebar has a path field with
+**Save** / **Load** buttons. A saved file captures the camera, render settings, and every
+object exactly as configured. Note that `--width`/`--height`/`--samples`/`--depth` on the
+command line always take precedence over the render settings stored in the file — the file
+supplies *what* to render, the flags control *how*. If `--scene` is omitted, the built-in
+demo scene is rendered.
 
 ---
 
 ## GUI Reference
+
+### Scene File
+
+| Control | Description |
+|---|---|
+| Path | File path used by Save and Load |
+| Save | Writes the current camera, render settings, and objects to the path as JSON |
+| Load | Replaces the current scene with the one loaded from the path |
 
 ### Camera
 
@@ -171,6 +198,8 @@ src/
   gui/
     mod.rs
     app.rs          # egui application — scene editor, threaded render, progress bar
+  scene_file.rs     # Serializable scene description (JSON) + Scene builder, shared
+                     # by the GUI (save/load) and headless mode (--scene)
   lib.rs
   main.rs
 ```
@@ -178,6 +207,13 @@ src/
 The renderer and GUI communicate through a clean boundary — the GUI constructs a `Scene`,
 calls `camera.render()` on a background thread, and receives the pixel buffer via a channel
 when complete.
+
+`scene_file` sits above `renderer`/`objects`/`materials` and below `gui`: it defines a flat,
+serializable `SceneObject` representation (unlike `renderer::Scene`, which holds
+`Arc<dyn Hittable>`/`Arc<dyn Material>` trait objects and can't be serialized directly) and a
+`build_scene()` function that turns a list of `SceneObject`s into a real `Scene`. Both
+`gui::app` and `main.rs` build their scenes through this one path, so there's a single
+definition of the demo scene rather than separate hardcoded copies.
 
 ---
 
@@ -234,6 +270,8 @@ integration. The denoiser compensates significantly at lower sample counts.
 | `rand` | Monte Carlo sampling |
 | `egui` / `eframe` | Immediate-mode GUI |
 | `image` | PNG output |
+| `clap` | Command-line argument parsing |
+| `serde` / `serde_json` | Scene file (de)serialization |
 
 ---
 
@@ -243,7 +281,7 @@ integration. The denoiser compensates significantly at lower sample counts.
 cargo test
 ```
 
-25 integration tests in `tests/` covering the color model, BVH traversal, all four geometry types, camera pixel mapping, and dielectric refraction. CI runs them automatically on every push and pull request to `master`.
+29 integration tests in `tests/` covering the color model, BVH traversal, all four geometry types, camera pixel mapping, dielectric refraction, and scene file save/load. CI runs them automatically on every push and pull request to `master`.
 
 ---
 
