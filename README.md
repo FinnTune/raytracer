@@ -3,7 +3,7 @@
 A physically based path tracer written from scratch in Rust, with a real-time GUI built
 with [egui](https://github.com/emilk/egui).
 
-![render example](output.png)
+![render example](docs/example-render.png)
 
 ---
 

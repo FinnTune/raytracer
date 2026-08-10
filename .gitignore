@@ -1,1 +1,5 @@
 /target
+
+# Render output — regenerated on every run
+/output.png
+/output.ppm
