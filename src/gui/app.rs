@@ -4,7 +4,7 @@ use std::sync::{
     Arc,
 };
 
-use crate::materials::{Diffuse, Emissive, Reflective};
+use crate::materials::{Dielectric, Diffuse, Emissive, Reflective};
 use crate::objects::{Cube, Cylinder, Plane, Sphere};
 use crate::renderer::camera::denoise;
 use crate::renderer::{CameraBuilder, Color, Scene};
@@ -37,6 +37,7 @@ pub enum MaterialKind {
     Diffuse,
     Reflective,
     Emissive,
+    Dielectric,
 }
 
 impl std::fmt::Display for MaterialKind {
@@ -45,6 +46,7 @@ impl std::fmt::Display for MaterialKind {
             MaterialKind::Diffuse => write!(f, "Diffuse"),
             MaterialKind::Reflective => write!(f, "Reflective"),
             MaterialKind::Emissive => write!(f, "Emissive"),
+            MaterialKind::Dielectric => write!(f, "Dielectric"),
         }
     }
 }
@@ -61,6 +63,7 @@ pub struct SceneObject {
     pub color: [f32; 3],
     pub strength: f32,
     pub fuzz: f32,
+    pub ior: f32,
 }
 
 impl Default for SceneObject {
@@ -76,6 +79,7 @@ impl Default for SceneObject {
             color: [0.8, 0.3, 0.2],
             strength: 3.0,
             fuzz: 0.05,
+            ior: 1.5,
         }
     }
 }
@@ -189,6 +193,17 @@ fn default_scene() -> Vec<SceneObject> {
             strength: 5.0,
             ..Default::default()
         },
+        SceneObject {
+            kind: ObjectKind::Sphere,
+            material: MaterialKind::Dielectric,
+            x: -0.7,
+            y: -0.2,
+            z: 1.5,
+            size: 0.3,
+            color: [1.0, 1.0, 1.0],
+            ior: 1.5,
+            ..Default::default()
+        },
     ]
 }
 
@@ -206,6 +221,7 @@ fn build_scene(objects: &[SceneObject]) -> Scene {
             MaterialKind::Diffuse => scene.add_material(Diffuse::new(color)),
             MaterialKind::Reflective => scene.add_material(Reflective::new(color, obj.fuzz as f64)),
             MaterialKind::Emissive => scene.add_material(Emissive::new(color, obj.strength as f64)),
+            MaterialKind::Dielectric => scene.add_material(Dielectric::new(color, obj.ior as f64)),
         };
 
         match obj.kind {
@@ -385,6 +401,11 @@ impl RtApp {
                                     MaterialKind::Emissive,
                                     "Emissive",
                                 );
+                                ui.selectable_value(
+                                    &mut obj.material,
+                                    MaterialKind::Dielectric,
+                                    "Dielectric",
+                                );
                             });
 
                         ui.horizontal(|ui| {
@@ -400,6 +421,12 @@ impl RtApp {
                                 ui.add(
                                     egui::Slider::new(&mut obj.strength, 0.1..=20.0)
                                         .text("Strength"),
+                                );
+                            }
+                            MaterialKind::Dielectric => {
+                                ui.add(
+                                    egui::Slider::new(&mut obj.ior, 1.0..=2.5)
+                                        .text("Index of refraction"),
                                 );
                             }
                             _ => {}

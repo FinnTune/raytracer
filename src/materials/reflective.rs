@@ -1,4 +1,4 @@
-use crate::materials::{Material, Scatter};
+use crate::materials::{reflect, Material, Scatter};
 use crate::objects::HitRecord;
 use crate::renderer::{ray::Ray, Color};
 use nalgebra::Vector3;
@@ -17,10 +17,6 @@ impl Reflective {
             fuzz: fuzz.min(1.0),
         }
     }
-}
-
-fn reflect(v: Vector3<f64>, n: Vector3<f64>) -> Vector3<f64> {
-    v - 2.0 * v.dot(&n) * n
 }
 
 fn random_in_unit_sphere() -> Vector3<f64> {
