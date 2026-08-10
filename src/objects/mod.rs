@@ -1,15 +1,15 @@
 use crate::renderer::ray::Ray;
 use nalgebra::Vector3;
 
-pub mod sphere;
 pub mod cube;
 pub mod cylinder;
 pub mod plane;
+pub mod sphere;
 
-pub use sphere::Sphere;
 pub use cube::Cube;
 pub use cylinder::Cylinder;
 pub use plane::Plane;
+pub use sphere::Sphere;
 
 pub type Vec3 = Vector3<f64>;
 
@@ -29,20 +29,20 @@ pub struct HitRecord {
 }
 
 impl HitRecord {
-    pub fn new(
-        point: Vec3,
-        outward_normal: Vec3,
-        t: f64,
-        ray: &Ray,
-        material_id: usize,
-    ) -> Self {
+    pub fn new(point: Vec3, outward_normal: Vec3, t: f64, ray: &Ray, material_id: usize) -> Self {
         let front_face = ray.direction.dot(&outward_normal) < 0.0;
         let normal = if front_face {
             outward_normal
         } else {
             -outward_normal
         };
-        Self { point, normal, t, front_face, material_id }
+        Self {
+            point,
+            normal,
+            t,
+            front_face,
+            material_id,
+        }
     }
 }
 

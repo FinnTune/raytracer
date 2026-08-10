@@ -4,7 +4,7 @@ use crate::renderer::{bvh::BvhNode, ray::Ray, Color};
 use std::sync::Arc;
 
 pub struct Scene {
-    pub objects:   Vec<Arc<dyn Hittable>>,
+    pub objects: Vec<Arc<dyn Hittable>>,
     pub materials: Vec<Arc<dyn Material>>,
     pub background: Color,
 }
@@ -12,7 +12,7 @@ pub struct Scene {
 impl Scene {
     pub fn new(background: Color) -> Self {
         Self {
-            objects:   Vec::new(),
+            objects: Vec::new(),
             materials: Vec::new(),
             background,
         }
@@ -34,12 +34,7 @@ impl Scene {
     }
 
     /// Trace using a pre-built BVH root (fast path)
-    pub fn trace_bvh(
-        &self,
-        bvh: &Arc<dyn Hittable>,
-        ray: &Ray,
-        depth: u32,
-    ) -> Color {
+    pub fn trace_bvh(&self, bvh: &Arc<dyn Hittable>, ray: &Ray, depth: u32) -> Color {
         if depth == 0 {
             return Color::BLACK;
         }
@@ -48,7 +43,7 @@ impl Scene {
             None => self.background,
             Some(hit) => {
                 let material = &self.materials[hit.material_id];
-                let emitted  = material.emitted();
+                let emitted = material.emitted();
                 match material.scatter(ray, &hit) {
                     None => emitted,
                     Some(scatter) => {
@@ -66,12 +61,12 @@ impl Scene {
             return Color::BLACK;
         }
 
-        let mut closest    = f64::MAX;
+        let mut closest = f64::MAX;
         let mut result_hit = None;
 
         for object in &self.objects {
             if let Some(hit) = object.hit(ray, 1e-4, closest) {
-                closest    = hit.t;
+                closest = hit.t;
                 result_hit = Some(hit);
             }
         }
@@ -80,7 +75,7 @@ impl Scene {
             None => self.background,
             Some(hit) => {
                 let material = &self.materials[hit.material_id];
-                let emitted  = material.emitted();
+                let emitted = material.emitted();
                 match material.scatter(ray, &hit) {
                     None => emitted,
                     Some(scatter) => {

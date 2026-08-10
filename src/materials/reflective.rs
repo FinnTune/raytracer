@@ -12,7 +12,10 @@ pub struct Reflective {
 
 impl Reflective {
     pub fn new(albedo: Color, fuzz: f64) -> Self {
-        Self { albedo, fuzz: fuzz.min(1.0) }
+        Self {
+            albedo,
+            fuzz: fuzz.min(1.0),
+        }
     }
 }
 

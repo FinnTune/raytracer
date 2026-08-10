@@ -10,7 +10,11 @@ pub struct Sphere {
 
 impl Sphere {
     pub fn new(center: Vector3<f64>, radius: f64, material_id: usize) -> Self {
-        Self { center, radius, material_id }
+        Self {
+            center,
+            radius,
+            material_id,
+        }
     }
 }
 
@@ -40,7 +44,13 @@ impl Hittable for Sphere {
         let point = ray.at(t);
         let outward_normal = (point - self.center) / self.radius;
 
-        Some(HitRecord::new(point, outward_normal, t, ray, self.material_id))
+        Some(HitRecord::new(
+            point,
+            outward_normal,
+            t,
+            ray,
+            self.material_id,
+        ))
     }
 
     fn bounding_box(&self) -> Aabb {
