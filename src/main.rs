@@ -1,19 +1,45 @@
+use clap::Parser;
 use nalgebra::Vector3;
 use rt::materials::{Diffuse, Emissive, Reflective};
 use rt::objects::{Cube, Cylinder, Plane, Sphere};
 use rt::renderer::{CameraBuilder, Color, Scene};
 use std::sync::{atomic::AtomicU64, Arc};
 
+/// Renders the hardcoded demo scene from the command line, or launches the GUI.
+#[derive(Parser)]
+#[command(version)]
+struct Cli {
+    /// Render the demo scene headlessly instead of launching the GUI
+    #[arg(long)]
+    no_gui: bool,
+
+    /// Output image width in pixels
+    #[arg(long, default_value_t = 600)]
+    width: u32,
+
+    /// Output image height in pixels
+    #[arg(long, default_value_t = 400)]
+    height: u32,
+
+    /// Rays per pixel — more samples means less noise, longer render
+    #[arg(long, default_value_t = 128)]
+    samples: u32,
+
+    /// Maximum ray bounces
+    #[arg(long, default_value_t = 32)]
+    depth: u32,
+}
+
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    if args.contains(&"--no-gui".to_string()) {
-        headless();
+    let cli = Cli::parse();
+    if cli.no_gui {
+        headless(&cli);
     } else {
         rt::gui::launch();
     }
 }
 
-fn headless() {
+fn headless(cli: &Cli) {
     let mut scene = Scene::new(Color::new(0.05, 0.07, 0.12));
 
     let grey = scene.add_material(Diffuse::new(Color::new(0.5, 0.5, 0.5)));
@@ -32,10 +58,10 @@ fn headless() {
 
     let bvh = scene.build_bvh();
 
-    let width = 600u32;
-    let height = 400u32;
-    let samples = 128u32;
-    let depth = 32u32;
+    let width = cli.width;
+    let height = cli.height;
+    let samples = cli.samples;
+    let depth = cli.depth;
 
     let camera = CameraBuilder::new()
         .position(Vector3::new(0.0, 1.5, 6.0))

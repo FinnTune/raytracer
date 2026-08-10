@@ -30,6 +30,9 @@ egui_extras = { version = "0.35", features = ["image"] }
 # Image output
 image = "0.25"
 
+# CLI args
+clap = { version = "4", features = ["derive"] }
+
 [dev-dependencies]
 nalgebra = "0.35"
 
