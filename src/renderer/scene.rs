@@ -54,36 +54,4 @@ impl Scene {
             }
         }
     }
-
-    /// Linear scan fallback — still useful for small scenes and testing
-    pub fn trace(&self, ray: &Ray, depth: u32) -> Color {
-        if depth == 0 {
-            return Color::BLACK;
-        }
-
-        let mut closest = f64::MAX;
-        let mut result_hit = None;
-
-        for object in &self.objects {
-            if let Some(hit) = object.hit(ray, 1e-4, closest) {
-                closest = hit.t;
-                result_hit = Some(hit);
-            }
-        }
-
-        match result_hit {
-            None => self.background,
-            Some(hit) => {
-                let material = &self.materials[hit.material_id];
-                let emitted = material.emitted();
-                match material.scatter(ray, &hit) {
-                    None => emitted,
-                    Some(scatter) => {
-                        let incoming = self.trace(&scatter.ray, depth - 1);
-                        emitted + incoming.attenuate(scatter.attenuation)
-                    }
-                }
-            }
-        }
-    }
 }
