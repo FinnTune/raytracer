@@ -3,14 +3,18 @@ use crate::renderer::ray::Ray;
 use nalgebra::Vector3;
 
 pub struct Plane {
-    pub center:      Vector3<f64>,
-    pub radius:      f64,
+    pub center: Vector3<f64>,
+    pub radius: f64,
     pub material_id: usize,
 }
 
 impl Plane {
     pub fn new(center: Vector3<f64>, radius: f64, material_id: usize) -> Self {
-        Self { center, radius, material_id }
+        Self {
+            center,
+            radius,
+            material_id,
+        }
     }
 }
 
@@ -18,7 +22,7 @@ impl Hittable for Plane {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
         // A horizontal plane has a fixed upward normal
         let normal = Vector3::new(0.0, 1.0, 0.0);
-        let denom  = ray.direction.dot(&normal);
+        let denom = ray.direction.dot(&normal);
 
         // Ray is parallel to the plane — no intersection
         if denom.abs() < 1e-8 {
@@ -46,8 +50,16 @@ impl Hittable for Plane {
         // Give the plane a tiny Y thickness so the AABB is never degenerate
         let pad = 1e-4;
         Aabb::new(
-            Vector3::new(self.center.x - self.radius, self.center.y - pad, self.center.z - self.radius),
-            Vector3::new(self.center.x + self.radius, self.center.y + pad, self.center.z + self.radius),
+            Vector3::new(
+                self.center.x - self.radius,
+                self.center.y - pad,
+                self.center.z - self.radius,
+            ),
+            Vector3::new(
+                self.center.x + self.radius,
+                self.center.y + pad,
+                self.center.z + self.radius,
+            ),
         )
     }
 }

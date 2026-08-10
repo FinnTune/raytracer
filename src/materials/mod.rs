@@ -4,12 +4,12 @@ use crate::{
 };
 
 pub mod diffuse;
-pub mod reflective;
 pub mod emissive;
+pub mod reflective;
 
 pub use diffuse::Diffuse;
-pub use reflective::Reflective;
 pub use emissive::Emissive;
+pub use reflective::Reflective;
 
 pub struct Scatter {
     /// The new ray after scattering

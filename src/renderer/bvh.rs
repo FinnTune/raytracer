@@ -4,9 +4,9 @@ use crate::objects::{Aabb, HitRecord, Hittable};
 use crate::renderer::ray::Ray;
 
 pub struct BvhNode {
-    left:  Arc<dyn Hittable>,
+    left: Arc<dyn Hittable>,
     right: Arc<dyn Hittable>,
-    bbox:  Aabb,
+    bbox: Aabb,
 }
 
 impl BvhNode {
@@ -23,9 +23,9 @@ impl BvhNode {
 
             // Two objects — leaf node with both children
             2 => {
-                let left  = Arc::clone(&objects[0]);
+                let left = Arc::clone(&objects[0]);
                 let right = Arc::clone(&objects[1]);
-                let bbox  = Aabb::surrounding(left.bounding_box(), right.bounding_box());
+                let bbox = Aabb::surrounding(left.bounding_box(), right.bounding_box());
                 Arc::new(BvhNode { left, right, bbox })
             }
 
@@ -48,9 +48,9 @@ impl BvhNode {
                 let mid = objects.len() / 2;
                 let (left_slice, right_slice) = objects.split_at_mut(mid);
 
-                let left  = BvhNode::build(left_slice);
+                let left = BvhNode::build(left_slice);
                 let right = BvhNode::build(right_slice);
-                let bbox  = Aabb::surrounding(left.bounding_box(), right.bounding_box());
+                let bbox = Aabb::surrounding(left.bounding_box(), right.bounding_box());
 
                 Arc::new(BvhNode { left, right, bbox })
             }
@@ -82,10 +82,7 @@ impl Hittable for BvhNode {
 
         // For the right child, tighten t_max to the left hit distance if we
         // already have a hit — no point finding something farther away
-        let t_max_right = left_hit
-            .as_ref()
-            .map(|h| h.t)
-            .unwrap_or(t_max);
+        let t_max_right = left_hit.as_ref().map(|h| h.t).unwrap_or(t_max);
 
         let right_hit = self.right.hit(ray, t_min, t_max_right);
 

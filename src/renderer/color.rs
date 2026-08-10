@@ -8,8 +8,16 @@ pub struct Color {
 }
 
 impl Color {
-    pub const BLACK: Color = Color { r: 0.0, g: 0.0, b: 0.0 };
-    pub const WHITE: Color = Color { r: 1.0, g: 1.0, b: 1.0 };
+    pub const BLACK: Color = Color {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+    };
+    pub const WHITE: Color = Color {
+        r: 1.0,
+        g: 1.0,
+        b: 1.0,
+    };
 
     pub fn new(r: f64, g: f64, b: f64) -> Self {
         Self { r, g, b }
@@ -26,9 +34,7 @@ impl Color {
 
     /// Gamma-correct and clamp to [0,255] for final output
     pub fn to_rgb_u8(self, gamma: f64) -> (u8, u8, u8) {
-        let encode = |c: f64| -> u8 {
-            (c.max(0.0).min(1.0).powf(1.0 / gamma) * 255.0).round() as u8
-        };
+        let encode = |c: f64| -> u8 { (c.clamp(0.0, 1.0).powf(1.0 / gamma) * 255.0).round() as u8 };
         (encode(self.r), encode(self.g), encode(self.b))
     }
 

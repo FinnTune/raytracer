@@ -3,8 +3,8 @@ use crate::renderer::ray::Ray;
 use nalgebra::Vector3;
 
 pub struct Cube {
-    pub center:      Vector3<f64>,
-    pub size:        f64,
+    pub center: Vector3<f64>,
+    pub size: f64,
     pub material_id: usize,
     // Pre-computed — avoids recalculating on every hit test
     min: Vector3<f64>,
@@ -14,15 +14,21 @@ pub struct Cube {
 impl Cube {
     pub fn new(center: Vector3<f64>, size: f64, material_id: usize) -> Self {
         let half = size / 2.0;
-        let min  = center - Vector3::new(half, half, half);
-        let max  = center + Vector3::new(half, half, half);
-        Self { center, size, material_id, min, max }
+        let min = center - Vector3::new(half, half, half);
+        let max = center + Vector3::new(half, half, half);
+        Self {
+            center,
+            size,
+            material_id,
+            min,
+            max,
+        }
     }
 
     fn normal_at(&self, point: Vector3<f64>) -> Vector3<f64> {
         // Find which face was hit by seeing which component is closest to a bound
-        let local   = point - self.center;
-        let half    = self.size / 2.0;
+        let local = point - self.center;
+        let half = self.size / 2.0;
         let epsilon = 1e-4 * self.size;
 
         if (local.x.abs() - half).abs() < epsilon {
@@ -39,7 +45,7 @@ impl Hittable for Cube {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
         // Slab method — intersect ray with three pairs of parallel planes
         let mut t_near = t_min;
-        let mut t_far  = t_max;
+        let mut t_far = t_max;
 
         for axis in 0..3 {
             let inv_d = 1.0 / ray.direction[axis];
@@ -51,7 +57,7 @@ impl Hittable for Cube {
             }
 
             t_near = t_near.max(t0);
-            t_far  = t_far.min(t1);
+            t_far = t_far.min(t1);
 
             if t_far < t_near {
                 return None;
@@ -64,10 +70,16 @@ impl Hittable for Cube {
             return None;
         }
 
-        let hit_point      = ray.at(t);
+        let hit_point = ray.at(t);
         let outward_normal = self.normal_at(hit_point);
 
-        Some(HitRecord::new(hit_point, outward_normal, t, ray, self.material_id))
+        Some(HitRecord::new(
+            hit_point,
+            outward_normal,
+            t,
+            ray,
+            self.material_id,
+        ))
     }
 
     fn bounding_box(&self) -> Aabb {

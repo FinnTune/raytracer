@@ -1,8 +1,8 @@
-use std::sync::{Arc, atomic::AtomicU64};
 use nalgebra::Vector3;
 use rt::materials::{Diffuse, Emissive, Reflective};
 use rt::objects::{Cube, Cylinder, Plane, Sphere};
 use rt::renderer::{CameraBuilder, Color, Scene};
+use std::sync::{atomic::AtomicU64, Arc};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -16,12 +16,12 @@ fn main() {
 fn headless() {
     let mut scene = Scene::new(Color::new(0.05, 0.07, 0.12));
 
-    let grey   = scene.add_material(Diffuse::new(Color::new(0.5, 0.5, 0.5)));
-    let red    = scene.add_material(Diffuse::new(Color::new(0.8, 0.2, 0.2)));
-    let green  = scene.add_material(Diffuse::new(Color::new(0.2, 0.7, 0.3)));
-    let blue   = scene.add_material(Diffuse::new(Color::new(0.2, 0.3, 0.9)));
+    let grey = scene.add_material(Diffuse::new(Color::new(0.5, 0.5, 0.5)));
+    let red = scene.add_material(Diffuse::new(Color::new(0.8, 0.2, 0.2)));
+    let green = scene.add_material(Diffuse::new(Color::new(0.2, 0.7, 0.3)));
+    let blue = scene.add_material(Diffuse::new(Color::new(0.2, 0.3, 0.9)));
     let mirror = scene.add_material(Reflective::new(Color::new(0.8, 0.8, 0.8), 0.05));
-    let light  = scene.add_material(Emissive::new(Color::WHITE, 5.0));
+    let light = scene.add_material(Emissive::new(Color::WHITE, 5.0));
 
     scene.add_object(Plane::new(Vector3::new(0.0, -0.5, 0.0), 20.0, grey));
     scene.add_object(Sphere::new(Vector3::new(-1.8, 0.0, 0.0), 0.5, red));
@@ -32,10 +32,10 @@ fn headless() {
 
     let bvh = scene.build_bvh();
 
-    let width   = 600u32;
-    let height  = 400u32;
+    let width = 600u32;
+    let height = 400u32;
     let samples = 128u32;
-    let depth   = 32u32;
+    let depth = 32u32;
 
     let camera = CameraBuilder::new()
         .position(Vector3::new(0.0, 1.5, 6.0))
@@ -45,10 +45,10 @@ fn headless() {
         .build();
 
     println!("Rendering {width}x{height} — {samples} samples, depth {depth}...");
-    let start    = std::time::Instant::now();
+    let start = std::time::Instant::now();
     let progress = Arc::new(AtomicU64::new(0));
-    let pixels   = camera.render(&scene, &bvh, width, height, samples, depth, progress);
-    let pixels   = rt::renderer::camera::denoise(&pixels, width, height);
+    let pixels = camera.render(&scene, &bvh, samples, depth, progress);
+    let pixels = rt::renderer::camera::denoise(&pixels, width, height);
     println!("Done in {:.2?}", start.elapsed());
 
     camera.write_to_ppm("output.ppm", &pixels);
